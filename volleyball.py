@@ -12,18 +12,20 @@ import subprocess
 import os
 import termios
 import sys
-
+import time
 import termios, fcntl, sys, os
 import RPi.GPIO as GPIO
 
 GPIO.setmode(GPIO.BOARD)
 # Don't use a pull up or pull down because that's usually used
 # for mechanicaly switches, and our chip's output is well-defined.
-channels = [8, 10, 11, 12, 13]
+
+QUIT_BUTTON = 8
+channels = [QUIT_BUTTON, 10, 11, 12, 13]
 for channel in channels:
     GPIO.setup(channel, GPIO.IN)
     
-file_path_or_url = '/home/pi/test.mpg'
+file_path_or_url = '/home/pi/Videos' + time.strftime('%Y-%m-%d-%H:%M:%S') + '.mpg'
 
 seekers = {
     12: -3000000,
@@ -71,21 +73,36 @@ class Engine:
     def initialize_player(self):
         camera.stop_preview()
         self.player = OMXPlayer(file_path_or_url, ['--win', '0,0,800,480'])
-    
+
+    def button_callback(self, channel):
+        if GPIO.input(channel):
+            self.button_released(channel)
+        else:
+            self.button_pressed(channel)
+            
+    def button_released(self, channel):
+        print('released!' + str(channel))
+        if channel is QUIT_BUTTON:
+            if time.time() - self.quitPressed > 1:
+                print('done')
+                engine.done = True
+            else:
+                print('live')
+                self.player.stop()
+                camera.start_preview()
+                
     def button_pressed(self, channel):
-        print('callback!' + str(channel))
-        if channel is 8:
-            self.done = True
-        elif channel is 11:
+        print('pressed!' + str(channel))
+        if channel is QUIT_BUTTON:
+            self.quitPressed = time.time()
+        elif channel is 11 and self.player:
+            self.player.action(23) # Step
+        elif channel is 10 and self.player:
             print('play/pause')
             if self.player:
                 self.player.play_pause()
             else:
                 self.initialize_player()
-        elif channel is 10 and self.player:
-            print('stop')
-            self.player.stop()
-            camera.start_preview()
         elif channel in seekers:
             print('seek')
             firstTime = False
@@ -112,7 +129,7 @@ class Engine:
             
 engine = Engine()
 for channel in channels:
-    GPIO.add_event_detect(channel, GPIO.FALLING, callback=engine.button_pressed, bouncetime=200)
+    GPIO.add_event_detect(channel, GPIO.BOTH, callback=engine.button_callback)
 
 try: 
     while not engine.done:
