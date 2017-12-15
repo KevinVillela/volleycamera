@@ -25,7 +25,7 @@ channels = [QUIT_BUTTON, 10, 11, 12, 13]
 for channel in channels:
     GPIO.setup(channel, GPIO.IN)
     
-file_path_or_url = '/home/pi/Videos' + time.strftime('%Y-%m-%d-%H:%M:%S') + '.mpg'
+file_path_or_url = '/home/pi/Videos/' + time.strftime('%Y-%m-%d-%H:%M:%S') + '.mpg'
 
 seekers = {
     12: -3000000,
@@ -142,10 +142,11 @@ try:
 # Kill the `omxplayer` process gracefully.
 finally:
     if camera:
+        camera.stop_preview()
         camera.stop_recording()
     ffmpeg.stdin.close()
     ffmpeg.kill()
-    engine.stop_player
+    engine.stop_player()
     termios.tcsetattr(fd, termios.TCSAFLUSH, oldterm)
     fcntl.fcntl(fd, fcntl.F_SETFL, oldflags)
 
